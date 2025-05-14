@@ -8,6 +8,7 @@ from tkinter import filedialog
 from PIL import ImageTk, Image 
 from tkinter.simpledialog import askstring
 from tkinter import messagebox
+import hashlib
 import shlex
 import shutil
 import os
@@ -50,9 +51,6 @@ middle_frame.pack(fill="both", expand=True, padx=10, pady=5)
 drop_label = tk.Label(middle_frame, text="(Drop images here or use file dialog)", fg="gray")
 drop_label.pack(pady=5)
 
-
-
-
 # ---- Preview Section ----
 preview_frame = tk.Frame(middle_frame)
 preview_frame.pack(pady=10)
@@ -90,6 +88,46 @@ def add_category():
 
         else:
             messagebox.showerror("Create category", "Category already exists")
+
+
+def checksum(file):
+    with open(file, "rb") as f:
+        file_hash = hashlib.md5()
+        while chunk := f.read(8192):
+            file_hash.update(chunk)
+        return file_hash.hexdigest()
+
+# Ensure secure file transferring
+def safe_file_move(src_path, dest_path) -> bool: # if the transfer was successful
+    # copy the file, get a checksum and then delete the original if they are the same.
+
+    try:
+        
+        if not os.path.exists(src_path) or not os.path.exists(dest_path):
+            return False
+
+        src_checksum = checksum(src_path)
+        file_copy = shutil.copy2(src_path, dest_path)
+        # shutil.copy2 preserves metadata (vital for some pictures)
+        
+        dest_checksum = checksum(file_copy)
+
+        # fail early
+        if src_checksum != dest_checksum:
+            messagebox.showinfo("Move file", "File copying interrupted, original did not match the copy.")
+            os.remove(file_copy)
+            return False
+        
+        # if it copied successfully delete the original
+        os.remove(src_path)
+        print("Successfully moved file")
+        return True
+
+    except Exception as e:
+        print(f"Move file exited with exception: {e}")
+        if os.path.exists(dest_path):
+            os.remove(dest_path)
+        return False
 
 
 def move_to_category():
