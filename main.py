@@ -1,7 +1,6 @@
-# First import TkinterDnD from tkinterdnd2
+
 from tkinterdnd2 import DND_FILES, TkinterDnD  
 
-# Then import tkinter and other related modules
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
@@ -15,7 +14,7 @@ import os
 
 # Create main window
 root = TkinterDnD.Tk() # VERY IMPORTANT! do not use tk.Tk()!!!!
-root.title("SortSnap - Drag-and-Drop Image Organizer")
+root.title("SnapSort - Drag & Drop Image Organizer")
 root.geometry("600x450")
 root.minsize(500, 400)
 
@@ -35,7 +34,7 @@ def browse_folder():
     path = filedialog.askdirectory()
     if path:
         folder_path.set(path)
-        print(f"Set the new folder path to {folder_path.get()}")
+        #print(f"Set the new folder path to {folder_path.get()}")
         folder_entry.configure(state="normal")
         folder_entry.xview_moveto(1.0)  # Scroll to the far right
         folder_entry.configure(state="readonly")
@@ -47,8 +46,7 @@ browse_btn.pack(side="left")
 middle_frame = tk.LabelFrame(root, text="🖼️ Drop Area", padx=10, pady=10, height=200)
 middle_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
-# Optional instructions
-drop_label = tk.Label(middle_frame, text="(Drop images here or use file dialog)", fg="gray")
+drop_label = tk.Label(middle_frame, text="(Drop images here)", fg="gray")
 drop_label.pack(pady=5)
 
 # ---- Preview Section ----
@@ -58,8 +56,17 @@ preview_frame.pack(pady=10)
 thumbnail = tk.Label(preview_frame, text="[Image Preview]")
 thumbnail.pack(side="left", padx=10)
 
-filename_label = tk.Label(preview_frame, text="")
-filename_label.pack(side="left")
+info_frame = tk.Frame(preview_frame)
+info_frame.pack()
+
+filename_label = tk.Label(info_frame, text="", height=1)
+filename_label.pack(side="top", ipady=15)
+
+dimensions_label = tk.Label(info_frame, text="", justify="left")
+dimensions_label.pack(side="top")
+
+filesize_label = tk.Label(info_frame, text="", justify="left")
+filesize_label.pack(side="top")#side="bottom")
 
 # ---- Bottom Frame: Category & Buttons ----
 bottom_frame = tk.Frame(root, pady=10)
@@ -81,7 +88,7 @@ def add_category():
     if category_name and len(category_name) > 0:
 
         if not category_name in snap_categories:
-            print("created new category: ", category_name)
+            #print("created new category: ", category_name)
             snap_categories.append(category_name)
             category_dropdown.config(values=snap_categories)
             category_dropdown.set(category_name)
@@ -90,7 +97,7 @@ def add_category():
             messagebox.showerror("Create category", "Category already exists")
 
 
-def checksum(file):
+def checksum(file) -> str:
     with open(file, "rb") as f:
         file_hash = hashlib.md5()
         while chunk := f.read(8192):
@@ -120,7 +127,7 @@ def safe_file_move(src_path, dest_path) -> bool: # if the transfer was successfu
         
         # if it copied successfully delete the original
         os.remove(src_path)
-        print("Successfully moved file")
+        #print("Successfully moved file")
         return True
 
     except Exception as e:
@@ -158,7 +165,7 @@ def move_to_category():
         print(current_file + " -> " + destination_path)
 
         if destination_path:
-            print("path exists, moving")
+            #print("path exists, moving")
             shutil.move(current_file, destination_path)
 
         clear_button_press()
@@ -171,6 +178,17 @@ move_btn.pack(side="left", padx=10)
 add_cat_btn = ttk.Button(bottom_frame, text="+ Add Category", command=add_category)
 add_cat_btn.pack(side="right", padx=5)
 
+def getFilesizeFmt(bytes):
+    a = {0: 'B', 1: 'KB', 2: 'MB', 3: 'GB', 4: 'TB', 5: 'PB', 6: 'EB'}
+    index = 0
+    numBytes = float(bytes) # bytes can be not a whole number
+
+    # stop if we're under the next unit
+    while numBytes >= 1024 and index < len(a) - 1: 
+        numBytes /= 1024
+        index += 1
+
+    return f"{numBytes:.1f} {a[index]}"
 
 queue = []
 current_file = None
@@ -179,10 +197,12 @@ def update_current_image():
     global current_file
 
     if not queue:
-        print("Queue is empty. No image to display.")
+        #print("Queue is empty. No image to display.")
         current_file = None
         #thumbnail.config(image="")  # Clear the image
         thumbnail.config(image="", text="[No image loaded]")
+        filesize_label.config(text="")
+        dimensions_label.config(text="")
         thumbnail.image = None
         return
 
@@ -191,12 +211,20 @@ def update_current_image():
 
     try:
         with Image.open(current_file) as img:
+            width, height = img.size
+            dimensions_label.config(text=f"Resolution: {width}x{height}")
+            
             img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
             thumbnail_photoimage = ImageTk.PhotoImage(img)
 
             thumbnail.config(image=thumbnail_photoimage)
             thumbnail.image = thumbnail_photoimage  # Keep reference
             filename_label.config(text=f"{os.path.basename(current_file)} ({len(queue)} left)")
+
+            filesize = os.path.getsize(current_file)
+            filesize_label.config(text=f"Size: {getFilesizeFmt(filesize)}")
+
+            
     except FileNotFoundError:
         print("File not found.")
     except Image.UnidentifiedImageError:
@@ -206,7 +234,7 @@ def update_current_image():
   
 
 def drop(event):
-    print("dropped new photo")
+    #print("dropped new photo")
     files = shlex.split(event.data)  # Handles multiple files with spaces
     for file in files:
 
@@ -234,7 +262,6 @@ def drop(event):
         else:
             messagebox.showerror("Drag and drop photo", "This photo has already been added to the queue")
             return
-        #drop_label.insert(tk.END, file)
     update_current_image()
 
     
@@ -242,11 +269,11 @@ def drop(event):
 def clear_button_press():
     global current_file
     # remove the current_file
-    print(current_file)
-    print(queue, type(current_file))
+    #print(current_file)
+    #print(queue, type(current_file))
 
     if current_file in queue:
-        print("exists in the queue")
+        #print("exists in the queue")
         queue.remove(current_file)
 
     filename_label.config(text="")
@@ -260,5 +287,10 @@ clear_btn.pack(side="right", padx=5)
 middle_frame.drop_target_register(DND_FILES)
 middle_frame.dnd_bind('<<Drop>>', drop)
 
-
-root.mainloop()
+try:
+    root.mainloop()
+except KeyboardInterrupt:
+    root.destroy()
+except Exception as e:
+    print("Unhandled Exception: " + e)
+    root.destroy()
